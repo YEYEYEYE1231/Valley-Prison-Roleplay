@@ -1,339 +1,255 @@
--- Valley Prison Roleplay Hub - JXL Thea Joe style advanced script
--- Features: Silent Aim, Kill Aura, Fly, Noclip, Auto Equip Gun, ESP, Speed Hacks
--- Author: JXL Thea Joe style (GPT-4 optimized)
--- GitHub: https://github.com/YEYEYEYE1231/Valley-Prison-Roleplay
+-- // KAVO UI LIBRARY LOADER
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 
---[[
-IMPORTANT:
-Upload this file as 'hub.lua' to your GitHub repo
-https://github.com/YEYEYEYE1231/Valley-Prison-Roleplay
-Branch: main
-]]
+-- // WINDOW SETUP
+local Window = Library.CreateLib("JXL Thea Valley Prison", "DarkTheme")
 
---!strict
+-- // TABS
+local CombatTab = Window:NewTab("Combat")
+local VisualsTab = Window:NewTab("Visuals")
+local MovementTab = Window:NewTab("Movement")
+local UtilityTab = Window:NewTab("Utility")
 
-local Players = game:GetService("Players")
+-- // SECTIONS
+local SilentAimSection = CombatTab:NewSection("Silent Aim & Combat")
+local KillAuraSection = CombatTab:NewSection("Kill Aura")
+
+local ESPSection = VisualsTab:NewSection("ESP Settings")
+
+local FlySection = MovementTab:NewSection("Fly & Noclip")
+local SpeedSection = MovementTab:NewSection("Speed & Jump")
+
+local MiscSection = UtilityTab:NewSection("Miscellaneous")
+
+-- // VARIABLES
+local Player = game.Players.LocalPlayer
+local Mouse = Player:GetMouse()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
--- Modern UI lib: Rayfield (https://github.com/Rayfield-Network/Rayfield)
-local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/Rayfield-Network/Rayfield/main/source"))()
+local SilentAimEnabled = false
+local KillAuraEnabled = false
+local FlyEnabled = false
+local NoclipEnabled = false
+local WalkSpeedValue = 16
+local JumpPowerValue = 50
 
-local Window = Rayfield:CreateWindow({
-    Name = "Valley Prison Roleplay Hub",
-    LoadingTitle = "JXL Thea Joe Style Hub",
-    LoadingSubtitle = "by GPT-4 optimized",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "JXL_ValleyPrison",
-        FileName = "Config"
-    },
-    Discord = {
-        Enabled = false,
-    }
-})
+local FlySpeed = 50
 
--- Feature state variables
-local flyEnabled = false
-local noclipEnabled = false
-local silentAimEnabled = false
-local killAuraEnabled = false
-local speedMultiplier = 1
+-- // HELPER FUNCTIONS
 
--- Fly settings
-local flySpeed = 50
+-- Anti-kick and anti-error wrapper for safe CFrame noclip/fly
+local function SafeSetCFrame(part, cframe)
+    local success, err = pcall(function()
+        part.CFrame = cframe
+    end)
+    if not success then
+        -- Try workaround or ignore
+    end
+end
 
--- Utility function: Raycast to target players (for silent aim)
-local function getClosestTarget()
-    local closestTarget = nil
+-- Silent Aim logic (simple example)
+local function GetSilentAimTarget()
+    local closestPlayer
     local shortestDistance = math.huge
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local head = plr.Character:FindFirstChild("Head")
-            if head then
-                local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= Player and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(root.Position)
                 if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                    if dist < shortestDistance and dist < 150 then -- max silent aim range
-                        closestTarget = plr
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).magnitude
+                    if dist < shortestDistance and dist < 150 then -- 150px radius for aim assist
                         shortestDistance = dist
+                        closestPlayer = plr
                     end
                 end
             end
         end
     end
-
-    return closestTarget
+    return closestPlayer
 end
 
--- Silent Aim hook
-local oldFireServer
-do
-    local mt = getrawmetatable(game)
-    local oldNamecall = mt.__namecall
-    setreadonly(mt, false)
-    mt.__namecall = newcclosure(function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
+-- Hook shooting (simplified) to redirect bullets to target
+local function HookSilentAim()
+    -- This depends on the game and weapon script, so you'll need to adapt this to Valley Prison
+    -- For example, override the shoot function or modify raycast origin to target HumanoidRootPart position
+end
 
-        if method == "FireServer" and tostring(self) == "ShootEvent" and silentAimEnabled then
-            local target = getClosestTarget()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                args[1] = target.Character.Head.Position -- modify hit position to target head pos
-                return oldFireServer(self, unpack(args))
-            end
+-- Kill Aura loop
+local function KillAuraLoop()
+    while KillAuraEnabled do
+        local target = GetSilentAimTarget()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            -- Simulate attack or fire weapon at target.HumanoidRootPart.Position
         end
-        return oldNamecall(self, ...)
-    end)
-    oldFireServer = mt.__namecall
-    setreadonly(mt, true)
-end
-
--- Fly Implementation (CFrame based with bypass)
-local flyPart = Instance.new("Part")
-flyPart.Size = Vector3.new(1,1,1)
-flyPart.Transparency = 1
-flyPart.CanCollide = false
-flyPart.Anchored = true
-flyPart.Name = "FlyPart"
-flyPart.Parent = workspace
-
-local function enableFly()
-    flyEnabled = true
-    local userInput = UserInputService
-    local cam = workspace.CurrentCamera
-
-    coroutine.wrap(function()
-        while flyEnabled do
-            RunService.Heartbeat:Wait()
-            local direction = Vector3.new(0,0,0)
-            if userInput:IsKeyDown(Enum.KeyCode.W) then
-                direction = direction + cam.CFrame.LookVector
-            end
-            if userInput:IsKeyDown(Enum.KeyCode.S) then
-                direction = direction - cam.CFrame.LookVector
-            end
-            if userInput:IsKeyDown(Enum.KeyCode.A) then
-                direction = direction - cam.CFrame.RightVector
-            end
-            if userInput:IsKeyDown(Enum.KeyCode.D) then
-                direction = direction + cam.CFrame.RightVector
-            end
-            if userInput:IsKeyDown(Enum.KeyCode.Space) then
-                direction = direction + Vector3.new(0,1,0)
-            end
-            if userInput:IsKeyDown(Enum.KeyCode.LeftControl) then
-                direction = direction - Vector3.new(0,1,0)
-            end
-
-            direction = direction.Unit * flySpeed * speedMultiplier
-            if direction ~= direction then direction = Vector3.new(0,0,0) end
-
-            flyPart.CFrame = flyPart.CFrame + direction * RunService.Heartbeat:Wait()
-            LocalPlayer.Character.HumanoidRootPart.CFrame = flyPart.CFrame
-        end
-    end)()
-end
-
-local function disableFly()
-    flyEnabled = false
-    flyPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-end
-
--- Noclip Implementation (CFrame based)
-local function noclip()
-    for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-        if part:IsA("BasePart") and part.CanCollide == true then
-            part.CanCollide = false
-        end
+        wait(0.1)
     end
 end
 
-local function enableNoclip()
-    noclipEnabled = true
-    RunService.Stepped:Connect(function()
-        if noclipEnabled then noclip() end
-    end)
-end
+-- Fly implementation using BodyVelocity + CFrame with anti-kick
+local function StartFly()
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
 
-local function disableNoclip()
-    noclipEnabled = false
-    for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
-        end
-    end
-end
+    local BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    BodyVelocity.Parent = hrp
 
--- Kill Aura Implementation (damage all nearby enemies)
-local function killAura()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-            if dist <= 10 then -- 10 studs range
-                -- Assuming game has a remote event to damage players
-                -- You have to replace the event names with your game's actual ones
-                pcall(function()
-                    game:GetService("ReplicatedStorage").DamageEvent:FireServer(plr.Character)
-                end)
+    FlyEnabled = true
+
+    local function FlyLoop()
+        while FlyEnabled and BodyVelocity.Parent do
+            local moveVector = Vector3.new(0,0,0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveVector = moveVector + Workspace.CurrentCamera.CFrame.LookVector
             end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveVector = moveVector - Workspace.CurrentCamera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveVector = moveVector - Workspace.CurrentCamera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveVector = moveVector + Workspace.CurrentCamera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                moveVector = moveVector + Vector3.new(0,1,0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                moveVector = moveVector - Vector3.new(0,1,0)
+            end
+            moveVector = moveVector.Unit * FlySpeed
+            BodyVelocity.Velocity = moveVector
+            wait()
         end
+        if BodyVelocity then BodyVelocity:Destroy() end
     end
+
+    coroutine.wrap(FlyLoop)()
 end
 
--- Auto Equip Gun
-local function autoEquipGun()
-    -- Replace with your actual weapon equip remote and logic
-    local backpack = LocalPlayer.Backpack
-    for _, tool in pairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            LocalPlayer.Character.Humanoid:EquipTool(tool)
-            break
-        end
-    end
+local function StopFly()
+    FlyEnabled = false
 end
 
--- ESP Implementation
-local espFolder = Instance.new("Folder", workspace)
-espFolder.Name = "JXL_ESP"
-local function createESP(plr)
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = plr.Character
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.Parent = espFolder
+-- Noclip toggle
+local function ToggleNoclip(state)
+    NoclipEnabled = state
 end
 
-local function removeESP()
-    espFolder:ClearAllChildren()
-end
-
--- Main GUI Tabs
-local CombatTab = Window:CreateTab("Combat")
-local VisualsTab = Window:CreateTab("Visuals")
-local MovementTab = Window:CreateTab("Movement")
-local UtilityTab = Window:CreateTab("Utility")
-
--- Combat Toggles
-CombatTab:CreateToggle({
-    Name = "Silent Aim",
-    CurrentValue = false,
-    Flag = "SilentAimToggle",
-    Callback = function(value)
-        silentAimEnabled = value
-    end
-})
-
-CombatTab:CreateToggle({
-    Name = "Kill Aura",
-    CurrentValue = false,
-    Flag = "KillAuraToggle",
-    Callback = function(value)
-        killAuraEnabled = value
-        if value then
-            spawn(function()
-                while killAuraEnabled do
-                    killAura()
-                    wait(0.3)
-                end
-            end)
-        end
-    end
-})
-
-CombatTab:CreateButton({
-    Name = "Auto Equip Gun",
-    Callback = function()
-        autoEquipGun()
-    end
-})
-
--- Visuals Toggles
-VisualsTab:CreateToggle({
-    Name = "ESP",
-    CurrentValue = false,
-    Callback = function(value)
-        if value then
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-                    createESP(plr)
+RunService.Stepped:Connect(function()
+    if NoclipEnabled then
+        local character = Player.Character
+        if character then
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
                 end
             end
-        else
-            removeESP()
         end
-    end
-})
-
--- Movement Toggles
-MovementTab:CreateToggle({
-    Name = "Fly",
-    CurrentValue = false,
-    Callback = function(value)
-        if value then
-            enableFly()
-        else
-            disableFly()
-        end
-    end
-})
-
-MovementTab:CreateToggle({
-    Name = "Noclip",
-    CurrentValue = false,
-    Callback = function(value)
-        if value then
-            enableNoclip()
-        else
-            disableNoclip()
-        end
-    end
-})
-
-MovementTab:CreateSlider({
-    Name = "Speed Multiplier",
-    Min = 1,
-    Max = 100,
-    Default = 1,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    Callback = function(value)
-        speedMultiplier = value
-    end
-})
-
--- Utility Tab (Add more if you want)
-UtilityTab:CreateButton({
-    Name = "Rejoin Server",
-    Callback = function()
-        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
-    end
-})
-
--- Auto-update (simple)
-local function autoUpdate()
-    local url = "https://raw.githubusercontent.com/YEYEYEYE1231/Valley-Prison-Roleplay/main/hub.lua"
-    local success, response = pcall(function()
-        return game:HttpGet(url)
-    end)
-    if success and response then
-        local currentHash = HttpService:GenerateGUID(false)
-        local remoteHash = HttpService:GenerateGUID(false)
-        -- Could implement hash check, but here just re-run latest script on demand
-        print("Auto-update check complete.")
-    end
-end
-
-spawn(function()
-    while true do
-        autoUpdate()
-        wait(1800) -- every 30 minutes
     end
 end)
 
-print("JXL Thea Joe Valley Prison Hub loaded. Have fun!")
+-- Auto equip guns (example, needs actual weapon names)
+local function AutoEquipGuns()
+    local backpack = Player.Backpack
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            Player.Character.Humanoid:EquipTool(item)
+            break -- Equip first available weapon
+        end
+    end
+end
+
+-- Speed and jump power setters
+local function SetWalkSpeed(speed)
+    local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = speed
+    end
+end
+
+local function SetJumpPower(power)
+    local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.JumpPower = power
+    end
+end
+
+-- // UI Elements
+
+SilentAimSection:NewToggle("Silent Aim", "Enable silent aim", function(state)
+    SilentAimEnabled = state
+    if state then
+        -- HookSilentAim()
+    else
+        -- Unhook
+    end
+end)
+
+KillAuraSection:NewToggle("Kill Aura", "Automatically attack nearby enemies", function(state)
+    KillAuraEnabled = state
+    if state then
+        coroutine.wrap(KillAuraLoop)()
+    end
+end)
+
+ESPSection:NewToggle("ESP", "Enable ESP for players", function(state)
+    -- Implement ESP here (use Drawing API or ESP libraries)
+end)
+
+FlySection:NewToggle("Fly", "Enable flying", function(state)
+    if state then
+        StartFly()
+    else
+        StopFly()
+    end
+end)
+
+FlySection:NewSlider("Fly Speed", "Speed for flying", 200, 20, function(value)
+    FlySpeed = value
+end)
+
+MovementTab:NewSlider("WalkSpeed", "Set walk speed", 500, 16, function(value)
+    WalkSpeedValue = value
+    SetWalkSpeed(value)
+end)
+
+MovementTab:NewSlider("JumpPower", "Set jump power", 250, 50, function(value)
+    JumpPowerValue = value
+    SetJumpPower(value)
+end)
+
+MovementTab:NewToggle("Noclip", "Toggle noclip", function(state)
+    ToggleNoclip(state)
+end)
+
+MiscSection:NewButton("Auto Equip Gun", "Automatically equips the first gun in backpack", function()
+    AutoEquipGuns()
+end)
+
+-- Auto update function
+local function AutoUpdate()
+    local repo = "YEYEYEYE1231/Valley-Prison-Roleplay"
+    local branch = "main"
+    local url = "https://raw.githubusercontent.com/"..repo.."/"..branch.."/hub.lua"
+    local success, scriptContent = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if success and scriptContent and scriptContent:len() > 50 then
+        loadstring(scriptContent)()
+    else
+        print("Failed to auto update script from GitHub")
+    end
+end
+
+-- Call AutoUpdate to refresh on load (optional)
+-- AutoUpdate()
+
+print("JXL Thea Valley Prison Script Loaded - Enjoy!")
 
