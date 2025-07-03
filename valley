@@ -1,235 +1,108 @@
--- Valley Prison Advanced Script Hub v2.0 (JXL Thea Mode)
--- Made for LX63 executor, optimized 2025
--- Features: Silent Aim, Kill Aura, Auto Weapon, ESP, Fly, Speed, Noclip, Auto Pickup, etc.
+-- Valley Prison JXL Hub 2025 - Advanced script with auto update and bypass
+-- UI: Rayfield, all features included: Fly, SilentAim, KillAura, ESP, Noclip, Auto Weapon Equip, etc.
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
-
--- UI Library (Rayfield style cyberpunk)
-local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxLibrary/Rayfield/main/source.lua"))()
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Valley Prison JXL Hub",
-    LoadingTitle = "Loading Valley Prison Hub...",
-    LoadingSubtitle = "by JXL Thea | LX63 Optimized",
+    Name = "Valley Prison JXL Hub | 2025 Edition",
+    LoadingTitle = "Loading JXL Thea Valley Prison Hub...",
+    LoadingSubtitle = "by YEYEYEYE1231",
     ConfigurationSaving = {
-       Enabled = true,
-       FolderName = "JXLValleyPrison",
-       FileName = "Config"
+        Enabled = true,
+        FolderName = "ValleyPrisonJXL", 
+        FileName = "Config"
     },
     Discord = {
-       Enabled = false,
-    },
-    KeySystem = false,
+        Enabled = false,
+    }
 })
 
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-local VisualTab = Window:CreateTab("Visuals", 4483362458)
-local MovementTab = Window:CreateTab("Movement", 4483362458)
-local UtilityTab = Window:CreateTab("Utility", 4483362458)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
 
--- Variables
-local SilentAimEnabled = false
-local SilentAimFOV = 30
-local SilentAimSmoothness = 0.2
-local KillAuraEnabled = false
-local KillAuraRange = 25
+-- Utility functions for bypassed Fly and Noclip --
 local FlyEnabled = false
-local FlySpeed = 50
-local NoclipEnabled = false
+local FlySpeed = 100
+local BodyVelocity
+local BodyGyro
 
--- Utility Functions
+local function FlyStart()
+    if FlyEnabled then return end
+    FlyEnabled = true
 
-local function getClosestTarget()
-    local closestTarget = nil
-    local shortestDistance = SilentAimFOV
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local screenPos, onScreen = Camera:WorldToScreenPoint(player.Character.Head.Position)
-            if onScreen then
-                local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                if dist < shortestDistance then
-                    shortestDistance = dist
-                    closestTarget = player
-                end
-            end
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Velocity = Vector3.new(0,0,0)
+    BodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+    BodyVelocity.Parent = hrp
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+    BodyGyro.CFrame = hrp.CFrame
+    BodyGyro.Parent = hrp
+
+    RunService:BindToRenderStep("FlyStep", 301, function()
+        if not FlyEnabled then
+            BodyVelocity:Destroy()
+            BodyGyro:Destroy()
+            RunService:UnbindFromRenderStep("FlyStep")
+            return
         end
-    end
-    return closestTarget
+
+        local direction = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction = direction + Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction = direction - Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction = direction - Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction = direction + Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction = direction - Vector3.new(0,1,0) end
+
+        BodyVelocity.Velocity = direction.Unit * FlySpeed
+        BodyGyro.CFrame = Camera.CFrame
+    end)
 end
 
--- Silent Aim Hook
+local function FlyStop()
+    FlyEnabled = false
+end
 
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
+-- Silent Aim Core
+local SilentAimEnabled = false
+local SilentAimFOV = 30
+local SilentAimTarget
 
-mt.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
+-- ESP Core
+local ESPEnabled = false
+local ESPObjects = {}
 
-    if SilentAimEnabled and tostring(method) == "FireServer" then
-        if tostring(self) == "ShootEvent" then -- example remote name, replace with actual
-            local target = getClosestTarget()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                args[1] = target.Character.Head.Position
-                args[2] = target.Character.Head
-            end
-            return oldNamecall(self, unpack(args))
-        end
+local function CreateESPForPlayer(plr)
+    if ESPObjects[plr] then return end
+    local espBox = Drawing.new("Square")
+    espBox.Visible = false
+    espBox.Color = Color3.new(1,0,0)
+    espBox.Thickness = 2
+    espBox.Transparency = 1
+
+    ESPObjects[plr] = espBox
+end
+
+local function RemoveESPForPlayer(plr)
+    if ESPObjects[plr] then
+        ESPObjects[plr]:Remove()
+        ESPObjects[plr] = nil
     end
+end
 
-    return oldNamecall(self, ...)
-end)
-
-setreadonly(mt, true)
-
--- Kill Aura Loop
-RunService.RenderStepped:Connect(function()
-    if KillAuraEnabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if dist <= KillAuraRange then
-                    -- Fire remote attack (replace with actual)
-                    ReplicatedStorage.Remotes.Attack:FireServer(player.Character.HumanoidRootPart)
-                end
-            end
-        end
-    end
-end)
-
--- UI Toggles and Sliders
-
-CombatTab:CreateToggle({
-    Name = "Silent Aim",
-    CurrentValue = false,
-    Flag = "SilentAimToggle",
-    Callback = function(value)
-        SilentAimEnabled = value
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Silent Aim FOV",
-    Min = 5,
-    Max = 100,
-    Default = 30,
-    Flag = "SilentAimFOVSlider",
-    Callback = function(value)
-        SilentAimFOV = value
-    end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Kill Aura",
-    CurrentValue = false,
-    Flag = "KillAuraToggle",
-    Callback = function(value)
-        KillAuraEnabled = value
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Kill Aura Range",
-    Min = 5,
-    Max = 50,
-    Default = 25,
-    Flag = "KillAuraRangeSlider",
-    Callback = function(value)
-        KillAuraRange = value
-    end,
-})
-
--- Movement Tab - Fly
-
-MovementTab:CreateToggle({
-    Name = "Fly",
-    CurrentValue = false,
-    Flag = "FlyToggle",
-    Callback = function(value)
-        FlyEnabled = value
-        if FlyEnabled then
-            local bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-            bodyVelocity.Parent = LocalPlayer.Character.HumanoidRootPart
-
-            local function fly()
-                while FlyEnabled and RunService.RenderStepped:Wait() do
-                    local direction = Vector3.new()
-                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                        direction = direction + Camera.CFrame.LookVector
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                        direction = direction - Camera.CFrame.LookVector
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                        direction = direction - Camera.CFrame.RightVector
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                        direction = direction + Camera.CFrame.RightVector
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                        direction = direction + Vector3.new(0, 1, 0)
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-                        direction = direction - Vector3.new(0, 1, 0)
-                    end
-                    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-                    bodyVelocity.Velocity = direction.Unit * FlySpeed
-                end
-                bodyVelocity:Destroy()
-            end
-
-            coroutine.wrap(fly)()
-        else
-            local bv = LocalPlayer.Character.HumanoidRootPart:FindFirstChildOfClass("BodyVelocity")
-            if bv then bv:Destroy() end
-        end
-    end,
-})
-
-MovementTab:CreateSlider({
-    Name = "Fly Speed",
-    Min = 10,
-    Max = 200,
-    Default = 50,
-    Flag = "FlySpeedSlider",
-    Callback = function(value)
-        FlySpeed = value
-    end,
-})
-
--- (Add more features and toggles similarly...)
-
--- Auto Update function (basic)
-spawn(function()
-    while true do
-        wait(300) -- every 5 mins
-        local success, newScript = pcall(function()
-            return game:HttpGet("https://raw.githubusercontent.com/YEYEYEYE1231/Valley-Prison-Roleplay/main/hub.lua")
-        end)
-        if success and newScript and newScript ~= script.Source then
-            loadstring(newScript)()
-            break
-        end
-    end
-end)
-
-Rayfield:Notify({
-    Title = "Valley Prison JXL Hub",
-    Content = "Loaded successfully!",
-    Duration = 5,
-    Image = 4483362458,
-})
-
--- End of script
+-- Weapon Auto Equip & Give (patched for 2025)
+local function GiveAllWeapons()
+    local plr = LocalPlayer
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Remote = ReplicatedStorage:FindFirstChild("WeaponRemote") or ReplicatedS
