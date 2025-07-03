@@ -1,77 +1,69 @@
--- hub.lua
--- Fully working Valley Prison script with Kavo UI and bypassed features
-
---[[ Kavo UI loader --]]
-local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/JxE6E6/Kavo-UI-Library/main/source.lua'))()
-local Window = Library.CreateLib("Valley Prison - JXL Mode", "DarkTheme")
-
--- Tabs
-local CombatTab = Window:NewTab("Combat")
-local VisualTab = Window:NewTab("Visuals")
-local MovementTab = Window:NewTab("Movement")
-local UtilityTab = Window:NewTab("Utility")
-
--- Sections
-local CombatSection = CombatTab:NewSection("Combat Features")
-local VisualSection = VisualTab:NewSection("Visuals")
-local MovementSection = MovementTab:NewSection("Movement & Fly")
-local UtilitySection = UtilityTab:NewSection("Utilities")
-
--- Utils
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
+-- JXL Valley Prison Hub - Minimal UI Base
 local UserInputService = game:GetService("UserInputService")
-local Mouse = LocalPlayer:GetMouse()
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-local function Notify(msg)
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "Valley Prison",
-        Text = msg,
-        Duration = 3
-    })
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "JXL_UI"
+screenGui.Parent = playerGui
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 450, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -225, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "JXL Valley Prison Hub"
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 40, 1, 0)
+closeBtn.Position = UDim2.new(1, -45, 0, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(70, 20, 20)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+closeBtn.Text = "X"
+closeBtn.Parent = titleBar
+
+closeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    print("[JXL_UI] UI Hidden")
+end)
+
+-- Toggle UI function
+local toggleKey = Enum.KeyCode.RightControl
+local function toggleUI()
+    mainFrame.Visible = not mainFrame.Visible
+    print("[JXL_UI] UI Visible:", mainFrame.Visible)
 end
 
--- Auto update function (calls self)
-local function AutoUpdate()
-    local url = "https://raw.githubusercontent.com/YEYEYEYE1231/Valley-Prison-Roleplay/main/hub.lua"
-    local code = game:HttpGet(url)
-    local func, err = loadstring(code)
-    if not func then
-        Notify("Auto-update error: "..err)
-        return
-    end
-    func()
-end
-
--- Call once at load
-AutoUpdate()
-
--- Combat: Silent Aim Toggle
-local silentAimEnabled = false
-CombatSection:NewToggle("Silent Aim", "Automatically aim at nearest enemy", function(state)
-    silentAimEnabled = state
-    if state then
-        Notify("Silent Aim enabled")
-    else
-        Notify("Silent Aim disabled")
+-- Bind toggle key
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == toggleKey then
+        toggleUI()
     end
 end)
 
--- Silent Aim logic (basic)
-RunService.RenderStepped:Connect(function()
-    if not silentAimEnabled then return end
-    -- Find closest enemy
-    local closestDist = math.huge
-    local closestPlayer = nil
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (player.Character.HumanoidRootPart.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
-            if dist < closestDist then
-                closestDist = dist
-                closestPlayer = player
-            end
-        end
-    end
-    if closestPlayer then
-        local hrp =
+print("[JXL_UI] Script loaded. Press RightCtrl to toggle the UI.")
