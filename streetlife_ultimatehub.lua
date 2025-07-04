@@ -37,24 +37,26 @@ if not success then
 end
 return
 ]]
--- Street Life Remastered | Ultimate Hub v3.1 - Fully Polished & Advanced UI
+-- Street Life Remastered | Ultimate Hub v3.1
+-- Author: YEYEYEYE1231
+-- GitHub: https://github.com/YEYEYEYE1231/Valley-Prison-Roleplay
+-- Last Updated: 2025-07-04
+
 repeat wait() until game:IsLoaded()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- Clean up old UI if exists
 local oldGui = StarterGui:FindFirstChild("StreetLifeUltimateHubUI")
 if oldGui then oldGui:Destroy() end
 
--- UI Setup --
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "StreetLifeUltimateHubUI"
 ScreenGui.ResetOnSpawn = false
@@ -78,7 +80,6 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 20
 titleLabel.Parent = mainFrame
 
--- Tabs UI --
 local tabHolder = Instance.new("Frame")
 tabHolder.Size = UDim2.new(0, 130, 1, -45)
 tabHolder.Position = UDim2.new(0, 0, 0, 45)
@@ -100,6 +101,7 @@ local function createPage(name)
     page.BackgroundTransparency = 1
     page.ScrollBarThickness = 5
     page.Visible = false
+    page.CanvasSize = UDim2.new(0, 0, 5, 0)
     page.Parent = pageHolder
     pages[name] = page
 
@@ -128,8 +130,64 @@ local function createPage(name)
     return page
 end
 
--- Enhanced UI elements --
+-- Custom slider constructor
+local function createSlider(page, text, min, max, default, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 60)
+    container.BackgroundTransparency = 1
+    container.Parent = page
 
+    local label = Instance.new("TextLabel")
+    label.Text = text .. ": " .. tostring(default)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(220, 220, 255)
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local sliderBG = Instance.new("Frame")
+    sliderBG.Size = UDim2.new(1, 0, 0, 20)
+    sliderBG.Position = UDim2.new(0, 0, 0, 30)
+    sliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+    sliderBG.BorderSizePixel = 0
+    sliderBG.Parent = container
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(90, 180, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBG
+
+    local dragging = false
+
+    sliderBG.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+
+    sliderBG.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = math.clamp(input.Position.X - sliderBG.AbsolutePosition.X, 0, sliderBG.AbsoluteSize.X)
+            local value = (relativeX / sliderBG.AbsoluteSize.X) * (max - min) + min
+            sliderFill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+            label.Text = string.format("%s: %.1f", text, value)
+            callback(value)
+        end
+    end)
+
+    return container
+end
+
+-- Toggle constructor (same as before, fixed if needed)
 local function createToggle(page, text, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -20, 0, 40)
@@ -227,7 +285,7 @@ local function createButton(page, text, callback)
     return btn
 end
 
--- Create Tabs and Pages
+-- Pages
 local bypassPage = createPage("Bypass & Settings")
 local movementPage = createPage("Movement")
 local combatPage = createPage("Combat")
@@ -235,32 +293,17 @@ local visualsPage = createPage("Visuals")
 
 local flags = {}
 
--- Bypass & Settings Tab
+-- Bypass & Settings
+
 createToggle(bypassPage, "Byfron Anticheat Bypass", function(state)
     flags.ByfronBypass = state
-    -- Passive bypass hooks active
+    -- Passive hooks here
 end)
 
-local clockLabel = Instance.new("TextLabel")
-clockLabel.Text = "Clocktime"
-clockLabel.Size = UDim2.new(1, -20, 0, 30)
-clockLabel.Position = UDim2.new(0, 10, 0, 40)
-clockLabel.BackgroundTransparency = 1
-clockLabel.TextColor3 = Color3.fromRGB(210, 210, 255)
-clockLabel.Font = Enum.Font.GothamSemibold
-clockLabel.TextSize = 16
-clockLabel.Parent = bypassPage
-
-local clockSlider = Instance.new("Slider")
-clockSlider.Min = 0
-clockSlider.Max = 24
-clockSlider.Value = workspace.Lighting.ClockTime
-clockSlider.Size = UDim2.new(1, -20, 0, 20)
-clockSlider.Position = UDim2.new(0, 10, 0, 75)
-clockSlider.Parent = bypassPage
-
-clockSlider.Changed:Connect(function()
-    workspace.Lighting.ClockTime = clockSlider.Value
+-- Clocktime Slider
+-- Using our custom slider instead of Roblox Slider
+createSlider(bypassPage, "Clocktime", 0, 24, workspace.Lighting.ClockTime, function(value)
+    workspace.Lighting.ClockTime = value
 end)
 
 createToggle(bypassPage, "Instant Respawn", function(state)
@@ -292,27 +335,9 @@ createToggle(movementPage, "Infinite Stamina", function(state)
     end
 end)
 
-local walkSpeedLabel = Instance.new("TextLabel")
-walkSpeedLabel.Text = "Walkspeed"
-walkSpeedLabel.Size = UDim2.new(1, -20, 0, 30)
-walkSpeedLabel.Position = UDim2.new(0, 10, 0, 40)
-walkSpeedLabel.BackgroundTransparency = 1
-walkSpeedLabel.TextColor3 = Color3.fromRGB(210, 210, 255)
-walkSpeedLabel.Font = Enum.Font.GothamSemibold
-walkSpeedLabel.TextSize = 16
-walkSpeedLabel.Parent = movementPage
-
-local walkSpeedSlider = Instance.new("Slider")
-walkSpeedSlider.Min = 16
-walkSpeedSlider.Max = 100
-walkSpeedSlider.Value = 16
-walkSpeedSlider.Size = UDim2.new(1, -20, 0, 20)
-walkSpeedSlider.Position = UDim2.new(0, 10, 0, 75)
-walkSpeedSlider.Parent = movementPage
-
-walkSpeedSlider.Changed:Connect(function()
+createSlider(movementPage, "Walkspeed", 16, 100, 16, function(value)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeedSlider.Value
+        LocalPlayer.Character.Humanoid.WalkSpeed = value
     end
 end)
 
@@ -445,7 +470,7 @@ end)
 
 createToggle(combatPage, "Infinite Ammo", function(state)
     flags.InfiniteAmmo = state
-    if state then
+    if state and hookmetamethod then
         local oldNamecall
         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             local method = getnamecallmethod()
@@ -456,25 +481,6 @@ createToggle(combatPage, "Infinite Ammo", function(state)
             end
             return oldNamecall(self, ...)
         end)
-    end
-end)
-
-createToggle(combatPage, "Autobuy Gun", function(state)
-    flags.AutobuyGun = state
-    if state then
-        coroutine.wrap(function()
-            while flags.AutobuyGun do
-                local Shop = workspace:FindFirstChild("Shop")
-                if Shop then
-                    for _, item in pairs(Shop:GetChildren()) do
-                        if item.Name == "Gun" and item:FindFirstChild("ClickDetector") then
-                            fireclickdetector(item.ClickDetector)
-                        end
-                    end
-                end
-                wait(1)
-            end
-        end)()
     end
 end)
 
@@ -492,6 +498,9 @@ local ESPBoxes = {}
 
 local function createESPBox(player)
     if player.Character and player.Character:FindFirstChild("Head") then
+        local existing = player.Character.Head:FindFirstChild("ESPBox")
+        if existing then existing:Destroy() end
+
         local box = Instance.new("BillboardGui")
         box.Name = "ESPBox"
         box.Adornee = player.Character.Head
@@ -518,6 +527,10 @@ local function removeESPBox(player)
         ESPBoxes[player]:Destroy()
         ESPBoxes[player] = nil
     end
+    if player.Character and player.Character:FindFirstChild("Head") then
+        local existing = player.Character.Head:FindFirstChild("ESPBox")
+        if existing then existing:Destroy() end
+    end
 end
 
 createToggle(visualsPage, "ESP Players", function(state)
@@ -529,7 +542,7 @@ createToggle(visualsPage, "ESP Players", function(state)
             end
         end
     else
-        for player, box in pairs(ESPBoxes) do
+        for player, _ in pairs(ESPBoxes) do
             removeESPBox(player)
         end
     end
